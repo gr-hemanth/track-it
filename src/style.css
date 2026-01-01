@@ -296,6 +296,56 @@ h3 {
   font-weight: 700;
   font-size: 1.1rem;
   color: var(--text-primary);
+  margin-right: 1rem;
+}
+
+.expense-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.date-edit-input {
+  font-family: inherit;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0.2rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.date-edit-input:hover {
+  border-color: var(--border-subtle);
+  background-color: var(--bg-input);
+}
+
+.date-edit-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  background-color: var(--bg-card);
+}
+
+.delete-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.4rem;
+  border-radius: 50%;
+  color: #ef4444;
+  /* Red-500 */
+  opacity: 0.6;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-btn:hover {
+  opacity: 1;
+  background-color: #fee2e2;
+  /* Red-100 */
 }
 
 /* Utilities */

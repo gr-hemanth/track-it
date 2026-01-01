@@ -24,7 +24,7 @@ document.querySelector('#app').innerHTML = `
       <h2 class="section-header">Dashboard</h2>
       <div class="summary-card">
         <span class="summary-label">Total Spent</span>
-        <div id="total-display" class="summary-amount">$0.00</div>
+        <div id="total-display" class="summary-amount">₹0.00</div>
       </div>
       <div id="insights-section" class="insights-card" style="display: none;">
         <div class="insights-icon">💡</div>
@@ -36,7 +36,13 @@ document.querySelector('#app').innerHTML = `
       <h2 class="section-header">New Entry</h2>
       <div class="add-expense-form">
         <div class="form-row">
-          <input type="text" id="category" class="input-field" placeholder="Category" />
+          <select id="category" class="input-field">
+            <option value="" disabled selected>Select category</option>
+            <option value="Food">Food</option>
+            <option value="Travel">Travel</option>
+            <option value="Stationery">Stationery</option>
+            <option value="Miscellaneous">Miscellaneous</option>
+          </select>
           <input type="date" id="date" class="input-field" />
         </div>
         <div class="form-row">
@@ -72,16 +78,24 @@ if (isConfigured) {
     document.getElementById('config-warning').textContent = "Error initializing Supabase: " + e.message;
     document.getElementById('config-warning').style.display = 'block';
   }
+} 
+if (isConfigured) {
+  try {
+    supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+  } catch (e) {
+    console.error("Supabase init error:", e);
+    document.getElementById('config-warning').textContent =
+      "Error initializing Supabase: " + e.message;
+    document.getElementById('config-warning').style.display = 'block';
+    throw e;
+  }
 } else {
+  document.getElementById('config-warning').textContent =
+    "Supabase is not configured properly.";
   document.getElementById('config-warning').style.display = 'block';
-  // Mock supabase for UI testing
-  supabase = {
-    from: () => ({
-      select: () => Promise.resolve({ data: [], error: { message: "Supabase not configured" } }),
-      insert: () => Promise.resolve({ error: { message: "Supabase not configured" } })
-    })
-  };
+  throw new Error("Supabase not configured");
 }
+
 
 const categoryInput = document.getElementById('category');
 const amountInput = document.getElementById('amount');
@@ -130,7 +144,7 @@ function generateInsights(expenses) {
     message = "Keep tracking expenses to reveal your spending habits!";
   } else if (topCategory) {
     const percent = Math.round((maxAmount / totalSpent) * 100);
-    message = `You spent <strong>$${maxAmount.toFixed(0)}</strong> on <strong>${topCategory}</strong> this period. That's ${percent}% of your total.`;
+    message = `You spent <strong>₹${maxAmount.toFixed(0)}</strong> on <strong>${topCategory}</strong> this period. That's ${percent}% of your total.`;
   } else {
     message = `You've tracked ${expenses.length} expenses. Great start!`;
   }
@@ -142,13 +156,13 @@ function generateInsights(expenses) {
 function renderExpenses(expenses) {
   if (!expenses || expenses.length === 0) {
     expensesList.innerHTML = '<li class="empty">No expenses found.</li>';
-    totalDisplay.textContent = 'Total: $0.00';
+    totalDisplay.textContent = 'Total: ₹0.00';
     insightsSection.style.display = 'none';
     return;
   }
 
   const total = expenses.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
-  totalDisplay.textContent = `Total: $${total.toFixed(2)}`;
+  totalDisplay.textContent = `Total: ₹${total.toFixed(2)}`;
 
   // Update insights based on visibility
   generateInsights(expenses);
@@ -157,12 +171,76 @@ function renderExpenses(expenses) {
     <li class="expense-card">
       <div class="expense-info">
         <span class="cat-name">${expense.category}</span>
-        <span class="date-label">${new Date(expense.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+        <input 
+          type="date" 
+          class="date-edit-input" 
+          value="${expense.date.split('T')[0]}" 
+          data-id="${expense.id}"
+        />
       </div>
-      <span class="expense-amount-display">$${parseFloat(expense.amount).toFixed(2)}</span>
+      <div class="expense-actions">
+        <span class="expense-amount-display">₹${parseFloat(expense.amount).toFixed(2)}</span>
+        <button class="delete-btn" data-id="${expense.id}" title="Delete Expense">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      </div>
     </li>
   `).join('');
 }
+
+async function deleteExpense(id) {
+  console.log('Attempting to delete expense:', id);
+  // Disable button to prevent double-click? (handled by fetch refresh usually, but good practice)
+
+  const { error } = await supabase
+    .from('expenses')
+    .delete()
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error deleting expense:', error);
+    alert('Failed to delete expense: ' + error.message);
+  } else {
+    console.log('Expense deleted successfully');
+    await fetchExpenses(); // Wait for refresh
+  }
+}
+
+async function updateExpenseDate(id, newDate) {
+  console.log('Updating date for expense:', id, 'to', newDate);
+
+  const { error } = await supabase
+    .from('expenses')
+    .update({ date: newDate })
+    .eq('id', id);
+
+  if (error) {
+    console.error('Error updating date:', error);
+    alert('Failed to update date: ' + error.message);
+  } else {
+    console.log('Date updated successfully');
+    await fetchExpenses(); // Wait for refresh
+  }
+}
+
+// Event Delegation for History List
+expensesList.addEventListener('click', (e) => {
+  const deleteBtn = e.target.closest('.delete-btn');
+  if (deleteBtn) {
+    const id = deleteBtn.dataset.id;
+    deleteExpense(id);
+  }
+});
+
+expensesList.addEventListener('change', (e) => {
+  if (e.target.classList.contains('date-edit-input')) {
+    const id = e.target.dataset.id;
+    const newDate = e.target.value;
+    updateExpenseDate(id, newDate);
+  }
+});
 
 function populateFilterOptions() {
   const categories = [...new Set(allExpenses.map(e => e.category))].sort();
